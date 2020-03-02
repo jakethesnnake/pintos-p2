@@ -338,7 +338,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (success)
      file_deny_write(file);
    else
-     file_close (file);
+     file_close (file); 
   return success;
 }
 
