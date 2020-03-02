@@ -4,6 +4,14 @@
 #include <stdbool.h>
 #include <debug.h>
 
+/* fd file stucture */
+struct file_fd 
+{
+   int fd;
+   struct file *f;
+   struct list_elem elem;
+};
+
 typedef int pid_t;
 
 void syscall_init (void);

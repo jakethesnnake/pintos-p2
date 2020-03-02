@@ -1,26 +1,30 @@
-#include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <syscall-nr.h>
+
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/synch.h"
+#include "threads/vaddr.h"
+
+#include "userprog/syscall.h"
 #include "userprog/process.h"
+
 #include "lib/kernel/list.h"
-#include "devices/input.h"
+
 #include "filesys/file.h"
+#include "filesys/file.c"
 #include "filesys/inode.h"
 #include "filesys/filesys.h"
-#include "devices/shutdown.h"
-#include "threads/vaddr.h"
 #include "filesys/directory.h"
+
+#include "devices/input.h"
+#include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *dst_, const void *usrc_, size_t size);
 static bool get_user (uint8_t *dst, const uint8_t *usrc);
  
-
-
 /* Inspired by this repo
    https://github.com/hfanc001/PintOS-Project-2/blob/master/pintos/src/userprog/syscall.c 
 */
@@ -143,7 +147,7 @@ int wait (pid_t pid)
 
 bool create (const char *file, unsigned initial_size) 
 {
-  return false;
+  return filesys_create(file, initial_size);
 }
 
 bool remove (const char *file) 
@@ -153,7 +157,16 @@ bool remove (const char *file)
 
 int open (const char *file) 
 {
-  return -1;
+  struct fd_file *fd_struct = malloc (4);
+  fd_struct->f = filesys_open(file);
+  
+  if (fd_struct->f == NULL)
+    return -1;
+  
+  struct thread* t = thread_current();
+
+  list_push_back(&t->files, fd_struct->elem);
+  return list_size(&t->files);
 }
 
 int filesize (int fd) 
@@ -168,8 +181,15 @@ int read (int fd, void *buffer, unsigned size)
 
 int write (int fd, const void *buffer, unsigned size) 
 {
-  putbuf(buffer, size);
-  return 1;
+  if (fd == 1) 
+  {
+    putbuf(buffer, size);
+    return size;
+  }
+
+  struct file* f = file_open(fd);
+
+  return file_write(f, buffer, size);
 }
 
 void seek (int fd, unsigned position) 
