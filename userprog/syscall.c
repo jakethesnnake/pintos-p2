@@ -60,8 +60,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   copy_in(argv, (uint32_t *) f->esp + 1, sizeof *argv * arg_map[system_call]);
 
-  printf("System Call: %d\n", system_call);
-
   switch (system_call)
   {
   case SYS_HALT:
@@ -120,18 +118,17 @@ syscall_handler (struct intr_frame *f UNUSED)
     thread_exit ();
     break;
   }
-
-  thread_exit ();
 }
 
 void halt()
 {
-
+  shutdown_power_off();
 }
 
 void exit(int status)
 {
-
+  thread_current()->parent->executed = true;
+  thread_exit();
 }
 
 pid_t exec(const char *file)

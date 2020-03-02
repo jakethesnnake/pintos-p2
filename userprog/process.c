@@ -60,8 +60,6 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  printf("Processes Start\n");
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -235,8 +233,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
     argv[argc] = token;
     argc++;
   }
-
-  printf("loading file\n");
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -471,7 +467,6 @@ setup_stack (void **esp, char * argv[], int argc)
         for(int i = argc - 1; i >= 0; i--)
         {
           *esp -= sizeof(char)*(strlen(argv[i]) + 1);
-          printf("arg: %s, %d\n", argv[i], sizeof(char)*(strlen(argv[i]) + 1));
           memcpy(*esp, argv[i], sizeof(char)*(strlen(argv[i]) + 1));
           arg_value_pointers[i] = (uint32_t *)*esp;
         }
