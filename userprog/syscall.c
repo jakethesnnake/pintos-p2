@@ -13,7 +13,6 @@
 #include "lib/kernel/list.h"
 
 #include "filesys/file.h"
-#include "filesys/file.c"
 #include "filesys/inode.h"
 #include "filesys/filesys.h"
 #include "filesys/directory.h"
@@ -157,7 +156,7 @@ bool remove (const char *file)
 
 int open (const char *file) 
 {
-  struct fd_file *fd_struct = malloc (4);
+  struct file_fd *fd_struct = malloc (4);
   fd_struct->f = filesys_open(file);
   
   if (fd_struct->f == NULL)
@@ -165,7 +164,7 @@ int open (const char *file)
   
   struct thread* t = thread_current();
 
-  list_push_back(&t->files, fd_struct->elem);
+  list_push_back(&t->files,&fd_struct->elem);
   return list_size(&t->files);
 }
 
