@@ -5,6 +5,15 @@
 #include <list.h>
 #include <stdint.h>
 
+/* fd file stucture */
+struct file_fd 
+{
+   int fd;
+   struct file *f;
+   struct list_elem elem;
+};
+
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -98,6 +107,7 @@ struct thread
 
     /* File system elements */
     struct list files;
+    int file_count;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

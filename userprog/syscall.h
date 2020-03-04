@@ -4,14 +4,6 @@
 #include <stdbool.h>
 #include <debug.h>
 
-/* fd file stucture */
-struct file_fd 
-{
-   int fd;
-   struct file *f;
-   struct list_elem elem;
-};
-
 typedef int pid_t;
 
 void syscall_init (void);
@@ -20,7 +12,7 @@ void process_exit (void);
 void process_activate (void);
 void halt();
 void exit(int status);
-pid_t exec(const char *file);
+pid_t exec(const char *cmd_line);
 int wait (pid_t pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);

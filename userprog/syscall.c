@@ -6,6 +6,7 @@
 #include "threads/thread.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 #include "userprog/syscall.h"
 #include "userprog/process.h"
@@ -13,10 +14,10 @@
 #include "lib/kernel/list.h"
 
 #include "filesys/file.h"
-#include "filesys/file.c"
 #include "filesys/inode.h"
 #include "filesys/filesys.h"
 #include "filesys/directory.h"
+#include "filesys/off_t.h"
 
 #include "devices/input.h"
 #include "devices/shutdown.h"
@@ -48,6 +49,22 @@ get_user (uint8_t *dst, const uint8_t *usrc)
   return eax != 0;
 }
 
+struct file*
+find_file(int fd)
+{
+  struct thread* t = thread_current();
+  struct list_elem* e = list_head (&t->files);
+  while ((e = list_next (e)) != list_end (&t->files)) 
+  {
+    struct file_fd *file_obj = list_entry (e, struct file_fd, elem);
+
+    if (file_obj->fd == fd)
+      return file_obj->f;
+  }
+
+  return NULL;
+}
+
 void
 syscall_init (void) 
 {
@@ -55,7 +72,7 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f) 
 {
   int * p = f->esp;
   int system_call = *p;
@@ -135,7 +152,7 @@ void exit(int status)
   thread_exit();
 }
 
-pid_t exec(const char *file)
+pid_t exec(const char *cmd_line)
 {
   return -1;
 }
@@ -147,36 +164,54 @@ int wait (pid_t pid)
 
 bool create (const char *file, unsigned initial_size) 
 {
+  if (file == NULL)
+  {
+    printf("Can't make file\n");
+    return false;
+  }
   return filesys_create(file, initial_size);
 }
 
 bool remove (const char *file) 
 {
-  return false;
+  return filesys_remove(file);
 }
 
 int open (const char *file) 
 {
-  struct fd_file *fd_struct = malloc (4);
+  if (file == NULL) 
+    return -1;
+
+  struct file_fd *fd_struct = malloc (4); 
   fd_struct->f = filesys_open(file);
   
-  if (fd_struct->f == NULL)
-    return -1;
-  
   struct thread* t = thread_current();
+  fd_struct->fd = t->file_count++;
 
-  list_push_back(&t->files, fd_struct->elem);
-  return list_size(&t->files);
+  list_push_back(&t->files, &fd_struct->elem);
+  return fd_struct->fd;
 }
 
 int filesize (int fd) 
 {
-  return -1;
+  return file_length(find_file(fd));
 }
 
 int read (int fd, void *buffer, unsigned size) 
 {
-  return -1;
+  if (fd == 0)
+  {
+    return input_getc();
+  }
+
+  struct file* f = find_file(fd);
+
+  if (f == NULL)
+    return -1;
+
+  file_read(f, buffer, size);
+  
+  return size;
 }
 
 int write (int fd, const void *buffer, unsigned size) 
@@ -187,22 +222,26 @@ int write (int fd, const void *buffer, unsigned size)
     return size;
   }
 
-  struct file* f = file_open(fd);
+  struct file* f = find_file(fd);
+
+  if (f == NULL)
+    return -1;
 
   return file_write(f, buffer, size);
 }
 
 void seek (int fd, unsigned position) 
 {
-
+  struct file *f = find_file(fd);
+  f->pos = position;
 }
 
 unsigned tell (int fd) 
 {
-  return 0;
+  return find_file(fd)->pos;
 }
 
 void close (int fd) 
 {
-
+  return file_close(find_file(fd));
 }
