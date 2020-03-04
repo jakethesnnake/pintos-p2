@@ -21,6 +21,21 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+struct thread*
+get_thread(tid_t tid, struct list *list)
+{
+  struct list_elem* e = list_head (list);
+  while ((e = list_next (e)) != list_end (list)) 
+  {
+    struct thread *t = list_entry (e, struct thread, child_elem);
+
+    if (t->tid == tid)
+      return t;
+  }
+
+  return NULL;
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -48,6 +63,12 @@ process_execute (const char *file_name)
   {
     palloc_free_page (fn_copy);
   }
+  else 
+  {
+    //struct thread *t = thread_current ();
+    //list_push_back(&t->parent->children, &t->child_elem);
+  }
+
   return tid;
 }
 
@@ -92,10 +113,21 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while(!thread_current()->executed);
-  return -1;
+  struct thread *t = thread_current();
+  struct thread *child_thread;
+  
+  if (list_size(&t->children) == 0) 
+    return -1;
+
+  child_thread = get_thread(child_tid, &t->children);
+
+  if (child_thread == NULL)
+    return -1;
+
+  sema_down(&child_thread->wait_sema);
+  return child_tid;
 }
 
 /* Free the current process's resources. */
@@ -105,8 +137,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  int exit_code = 0;
-  printf ("%s: exit(%d)\n", cur->name, exit_code);
+  if (&cur->wait_sema != NULL)
+    sema_up(&cur->wait_sema);
+
+  printf ("%s: exit(%d)\n", cur->name, cur->exit_status);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

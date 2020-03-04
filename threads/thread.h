@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* fd file stucture */
 struct file_fd 
@@ -99,8 +100,14 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t wakeup_tick;
-    bool executed;                     /* Temperary */
-    struct thread* parent;             /* Temperary */
+
+    /* Wait elements */
+    bool executed;                     
+    struct thread* parent;             
+    struct list children;
+    struct list_elem child_elem; 
+    struct semaphore wait_sema;      
+    int exit_status;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

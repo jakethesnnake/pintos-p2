@@ -149,24 +149,24 @@ void halt()
 void exit(int status)
 {
   thread_current()->parent->executed = true;
+  thread_current()->exit_status = status;
   thread_exit();
 }
 
 pid_t exec(const char *cmd_line)
 {
-  return -1;
+  return process_execute(cmd_line);
 }
 
 int wait (pid_t pid) 
 {
-  return -1;
+  return process_wait(pid);
 }
 
 bool create (const char *file, unsigned initial_size) 
 {
   if (file == NULL)
   {
-    printf("Can't make file\n");
     return false;
   }
   return filesys_create(file, initial_size);
