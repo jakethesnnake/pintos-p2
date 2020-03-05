@@ -155,15 +155,14 @@ void halt()
 
 void exit(int status)
 {
-  //thread_current()->parent->executed = true;
   thread_current()->exit_status = status;
-  //printf("exit status %d\n", thread_current()->exit_status);
   thread_exit();
 }
 
 pid_t exec(const char *cmd_line)
 {
   if(cmd_line == NULL) return -1;
+
   lock_acquire(&file_lock);
   pid_t pid = process_execute(cmd_line);
   lock_release(&file_lock);
@@ -181,6 +180,7 @@ bool create (const char *file, unsigned initial_size)
   {
     return false;
   }
+
   lock_acquire(&file_lock);
   bool was_created = filesys_create(file, initial_size);
   lock_release(&file_lock);
@@ -198,15 +198,19 @@ bool remove (const char *file)
 int open (const char *file) 
 {
   if (file == NULL) 
-    return -1;
+  {
+    return -1;  
+  }
 
   lock_acquire(&file_lock);
-
   struct file_fd *fd_struct = malloc (4); 
   fd_struct->f = filesys_open(file);
 
   if (fd_struct->f == NULL)
+  {
+    lock_release(&file_lock);
     return -1;
+  }
   
   struct thread* t = thread_current();
   fd_struct->fd = t->file_count++;
