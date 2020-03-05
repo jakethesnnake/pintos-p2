@@ -281,6 +281,8 @@ void
 thread_exit (void) 
 {
   ASSERT (!intr_context ());
+  /* Parent is signaled */
+  sema_up(&thread_current ()->wait_sema);
 
 #ifdef USERPROG
   process_exit ();

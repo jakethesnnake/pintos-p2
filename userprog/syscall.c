@@ -26,6 +26,12 @@ static void syscall_handler (struct intr_frame *);
 static void copy_in (void *dst_, const void *usrc_, size_t size);
 static bool get_user (uint8_t *dst, const uint8_t *usrc);
  
+/*
+  Inspired by: https://github.com/ChristianJHughes/pintos-project2
+  Ensures mutual exclusion in the file system
+*/
+struct lock file_lock;
+
 /* Inspired by this repo
    https://github.com/hfanc001/PintOS-Project-2/blob/master/pintos/src/userprog/syscall.c 
 */
@@ -68,6 +74,7 @@ find_file(int fd)
 void
 syscall_init (void) 
 {
+  lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -155,7 +162,11 @@ void exit(int status)
 
 pid_t exec(const char *cmd_line)
 {
-  return process_execute(cmd_line);
+  if(cmd_line == NULL) return -1;
+  lock_acquire(&file_lock);
+  pid_t pid = process_execute(cmd_line);
+  lock_release(&file_lock);
+  return pid;
 }
 
 int wait (pid_t pid) 
@@ -169,12 +180,18 @@ bool create (const char *file, unsigned initial_size)
   {
     return false;
   }
-  return filesys_create(file, initial_size);
+  lock_acquire(&file_lock);
+  bool was_created = filesys_create(file, initial_size);
+  lock_release(&file_lock);
+  return was_created;
 }
 
 bool remove (const char *file) 
 {
-  return filesys_remove(file);
+  lock_acquire(&file_lock);
+  bool was_removed = filesys_remove(file);
+  lock_release(&file_lock);
+  return was_removed;
 }
 
 int open (const char *file) 
@@ -182,66 +199,97 @@ int open (const char *file)
   if (file == NULL) 
     return -1;
 
+  lock_acquire(&file_lock);
+
   struct file_fd *fd_struct = malloc (4); 
-  fd_struct->f = filesys_open(file);
+
+  struct file * f = filesys_open(file);
+
+  if(f == NULL) {
+    lock_release(&file_lock);
+    return -1;
+  }
+
+  fd_struct->f = f;
   
   struct thread* t = thread_current();
   fd_struct->fd = t->file_count++;
 
   list_push_back(&t->files, &fd_struct->elem);
+  lock_release(&file_lock);
   return fd_struct->fd;
 }
 
 int filesize (int fd) 
 {
-  return file_length(find_file(fd));
+  lock_acquire(&file_lock);
+  int len = (int) file_length(find_file(fd));
+  lock_release(&file_lock);
+  return len;
 }
 
 int read (int fd, void *buffer, unsigned size) 
 {
+  lock_acquire(&file_lock);
   if (fd == 0)
   {
+    lock_release(&file_lock);
     return input_getc();
   }
 
   struct file* f = find_file(fd);
 
-  if (f == NULL)
+  if (f == NULL) {
+    lock_release(&file_lock);
     return -1;
-
+  }
+    
   file_read(f, buffer, size);
+  lock_release(&file_lock);
   
   return size;
 }
 
 int write (int fd, const void *buffer, unsigned size) 
 {
+  lock_acquire(&file_lock);
   if (fd == 1) 
   {
     putbuf(buffer, size);
+    lock_release(&file_lock);
     return size;
   }
 
   struct file* f = find_file(fd);
 
-  if (f == NULL)
+  if (f == NULL) {
+    lock_release(&file_lock);
     return -1;
+  }
 
+  lock_release(&file_lock);
   return file_write(f, buffer, size);
 }
 
 void seek (int fd, unsigned position) 
 {
+  lock_acquire(&file_lock);
   struct file *f = find_file(fd);
   f->pos = position;
+  lock_release(&file_lock);
 }
 
 unsigned tell (int fd) 
 {
-  return find_file(fd)->pos;
+  lock_acquire(&file_lock);
+  off_t pos = find_file(fd)->pos;
+  lock_release(&file_lock);
+  return pos;
 }
 
 void close (int fd) 
 {
-  return file_close(find_file(fd));
+  lock_acquire(&file_lock);
+  file_close(find_file(fd));
+  lock_release(&file_lock);
 }
