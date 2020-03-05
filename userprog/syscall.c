@@ -24,7 +24,7 @@
 
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *dst_, const void *usrc_, size_t size);
-static bool get_user (uint8_t *dst, const uint8_t *usrc);
+static bool is_user (uint8_t *dst, const uint8_t *usrc);
  
 /*
   Inspired by: https://github.com/ChristianJHughes/pintos-project2
@@ -42,12 +42,12 @@ copy_in (void *dst_, const void *usrc_, size_t size)
   const uint8_t *usrc = usrc_;
 
   for (; size > 0; size--, dst++, usrc++)
-    if (usrc >= (uint8_t *) PHYS_BASE || !get_user (dst, usrc))
+    if (usrc >= (uint8_t *) PHYS_BASE || !is_user (dst, usrc))
       thread_exit ();
 }
 
 static bool
-get_user (uint8_t *dst, const uint8_t *usrc)
+is_user (uint8_t *dst, const uint8_t *usrc)
 {
   int eax;
   asm ("movl $1f, %%eax; movb %2, %%al; movb %%al, %0; 1:"
@@ -155,8 +155,9 @@ void halt()
 
 void exit(int status)
 {
-  thread_current()->parent->executed = true;
+  //thread_current()->parent->executed = true;
   thread_current()->exit_status = status;
+  //printf("exit status %d\n", thread_current()->exit_status);
   thread_exit();
 }
 
@@ -202,15 +203,10 @@ int open (const char *file)
   lock_acquire(&file_lock);
 
   struct file_fd *fd_struct = malloc (4); 
+  fd_struct->f = filesys_open(file);
 
-  struct file * f = filesys_open(file);
-
-  if(f == NULL) {
-    lock_release(&file_lock);
+  if (fd_struct->f == NULL)
     return -1;
-  }
-
-  fd_struct->f = f;
   
   struct thread* t = thread_current();
   fd_struct->fd = t->file_count++;
@@ -239,7 +235,7 @@ int read (int fd, void *buffer, unsigned size)
 
   struct file* f = find_file(fd);
 
-  if (f == NULL) {
+  if (f == NULL || buffer == NULL) {
     lock_release(&file_lock);
     return -1;
   }
@@ -290,6 +286,9 @@ unsigned tell (int fd)
 void close (int fd) 
 {
   lock_acquire(&file_lock);
-  file_close(find_file(fd));
+  struct file* f = find_file(fd);
+
+  if (f != NULL)
+    file_close(f);
   lock_release(&file_lock);
 }
