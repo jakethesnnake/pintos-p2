@@ -36,6 +36,21 @@ get_thread(tid_t tid, struct list *list)
   return NULL;
 }
 
+int
+get_exit_status(tid_t tid, struct list *list)
+{
+  struct list_elem* e = list_head (list);
+  while ((e = list_next (e)) != list_end (list)) 
+  {
+    struct child_exits *t = list_entry (e, struct child_exits, elem);
+
+    if (t->tid == tid)
+      return t->exit_status;
+  }
+
+  return -1;
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -65,8 +80,6 @@ process_execute (const char *file_name)
   }
   else 
   {
-    //struct thread *t = thread_current ();
-    //list_push_back(&t->parent->children, &t->child_elem);
   }
 
   return tid;
@@ -103,6 +116,7 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
+int last_exit = 0;
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -127,7 +141,7 @@ process_wait (tid_t child_tid)
     return -1;
 
   sema_down(&child_thread->wait_sema);
-  return child_tid;
+  return get_exit_status(child_tid, &thread_current()->child_exits);
 }
 
 /* Free the current process's resources. */
@@ -137,10 +151,16 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  printf ("%s: exit(%d)\n", cur->name, cur->exit_status);
+
+  /* Add exit statuses */
+  struct child_exits* ce = malloc(3);
+  ce->exit_status = cur->exit_status;
+  ce->tid = cur->tid;
+  list_push_back(&cur->parent->child_exits, &ce->elem);
+
   if (&cur->wait_sema != NULL)
     sema_up(&cur->wait_sema);
-
-  printf ("%s: exit(%d)\n", cur->name, cur->exit_status);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

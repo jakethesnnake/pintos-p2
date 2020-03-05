@@ -24,7 +24,7 @@
 
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *dst_, const void *usrc_, size_t size);
-static bool get_user (uint8_t *dst, const uint8_t *usrc);
+static bool is_user (uint8_t *dst, const uint8_t *usrc);
  
 /* Inspired by this repo
    https://github.com/hfanc001/PintOS-Project-2/blob/master/pintos/src/userprog/syscall.c 
@@ -36,12 +36,12 @@ copy_in (void *dst_, const void *usrc_, size_t size)
   const uint8_t *usrc = usrc_;
 
   for (; size > 0; size--, dst++, usrc++)
-    if (usrc >= (uint8_t *) PHYS_BASE || !get_user (dst, usrc))
+    if (usrc >= (uint8_t *) PHYS_BASE || !is_user (dst, usrc))
       thread_exit ();
 }
 
 static bool
-get_user (uint8_t *dst, const uint8_t *usrc)
+is_user (uint8_t *dst, const uint8_t *usrc)
 {
   int eax;
   asm ("movl $1f, %%eax; movb %2, %%al; movb %%al, %0; 1:"
@@ -148,8 +148,9 @@ void halt()
 
 void exit(int status)
 {
-  thread_current()->parent->executed = true;
+  //thread_current()->parent->executed = true;
   thread_current()->exit_status = status;
+  //printf("exit status %d\n", thread_current()->exit_status);
   thread_exit();
 }
 
@@ -184,6 +185,9 @@ int open (const char *file)
 
   struct file_fd *fd_struct = malloc (4); 
   fd_struct->f = filesys_open(file);
+
+  if (fd_struct->f == NULL)
+    return -1;
   
   struct thread* t = thread_current();
   fd_struct->fd = t->file_count++;
@@ -206,7 +210,7 @@ int read (int fd, void *buffer, unsigned size)
 
   struct file* f = find_file(fd);
 
-  if (f == NULL)
+  if (f == NULL || buffer == NULL)
     return -1;
 
   file_read(f, buffer, size);
@@ -243,5 +247,8 @@ unsigned tell (int fd)
 
 void close (int fd) 
 {
-  return file_close(find_file(fd));
+  struct file* f = find_file(fd);
+
+  if (f != NULL)
+    file_close(f);
 }

@@ -463,7 +463,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  t->executed = false;
   t->parent = running_thread();
   t->file_count = 2;
 
@@ -471,6 +470,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
   list_init(&t->files);
   list_init(&t->children);
+  list_init(&t->child_exits);
   sema_init (&t->wait_sema, 0);
   list_push_back(&t->parent->children, &t->child_elem);
 
