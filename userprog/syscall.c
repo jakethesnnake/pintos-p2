@@ -43,7 +43,7 @@ copy_in (void *dst_, const void *usrc_, size_t size)
 
   for (; size > 0; size--, dst++, usrc++)
     if (usrc >= (uint8_t *) PHYS_BASE || !is_user (dst, usrc))
-      thread_exit ();
+      exit(-1);
 }
 
 static bool
@@ -56,7 +56,7 @@ is_user (uint8_t *dst, const uint8_t *usrc)
 }
 
 struct file*
-find_file(int fd)
+find_file(int fd, bool close)
 {
   struct thread* t = thread_current();
   struct list_elem* e = list_head (&t->files);
@@ -65,7 +65,11 @@ find_file(int fd)
     struct file_fd *file_obj = list_entry (e, struct file_fd, elem);
 
     if (file_obj->fd == fd)
+    {
+      if (close)
+        list_remove(e);
       return file_obj->f;
+    }
   }
 
   return NULL;
@@ -178,6 +182,7 @@ bool create (const char *file, unsigned initial_size)
 {
   if (file == NULL)
   {
+    exit(-1);
     return false;
   }
 
@@ -223,7 +228,7 @@ int open (const char *file)
 int filesize (int fd) 
 {
   lock_acquire(&file_lock);
-  int len = (int) file_length(find_file(fd));
+  int len = (int) file_length(find_file(fd, false));
   lock_release(&file_lock);
   return len;
 }
@@ -231,13 +236,16 @@ int filesize (int fd)
 int read (int fd, void *buffer, unsigned size) 
 {
   lock_acquire(&file_lock);
+  if (!is_user_vaddr (buffer))
+    exit (-1);
+
   if (fd == 0)
   {
     lock_release(&file_lock);
     return input_getc();
   }
 
-  struct file* f = find_file(fd);
+  struct file* f = find_file(fd, false);
 
   if (f == NULL || buffer == NULL) {
     lock_release(&file_lock);
@@ -260,7 +268,7 @@ int write (int fd, const void *buffer, unsigned size)
     return size;
   }
 
-  struct file* f = find_file(fd);
+  struct file* f = find_file(fd, false);
 
   if (f == NULL) {
     lock_release(&file_lock);
@@ -274,7 +282,7 @@ int write (int fd, const void *buffer, unsigned size)
 void seek (int fd, unsigned position) 
 {
   lock_acquire(&file_lock);
-  struct file *f = find_file(fd);
+  struct file *f = find_file(fd, false);
   f->pos = position;
   lock_release(&file_lock);
 }
@@ -282,7 +290,7 @@ void seek (int fd, unsigned position)
 unsigned tell (int fd) 
 {
   lock_acquire(&file_lock);
-  off_t pos = find_file(fd)->pos;
+  off_t pos = find_file(fd, false)->pos;
   lock_release(&file_lock);
   return pos;
 }
@@ -290,9 +298,10 @@ unsigned tell (int fd)
 void close (int fd) 
 {
   lock_acquire(&file_lock);
-  struct file* f = find_file(fd);
+  struct file* f = find_file(fd, true);
 
   if (f != NULL)
     file_close(f);
+  
   lock_release(&file_lock);
 }

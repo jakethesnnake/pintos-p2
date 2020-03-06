@@ -29,8 +29,10 @@ get_thread(tid_t tid, struct list *list)
   {
     struct thread *t = list_entry (e, struct thread, child_elem);
 
-    if (t->tid == tid)
+    if (t->tid == tid) {
+      list_remove(e);
       return t;
+    }
   }
 
   return NULL;
@@ -58,7 +60,7 @@ get_exit_status(tid_t tid, struct list *list)
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy, *token, *save_ptr;
+  char *fn_copy, *save_ptr, *file_copy;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -69,10 +71,17 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   
   /* Parse the args */
-  token = strtok_r ((char*)file_name, " ", &save_ptr);
+  file_copy = malloc(strlen(file_name)+1);
+  strlcpy (file_copy, file_name, strlen(file_name)+1);
+  file_copy = strtok_r ((char*)file_copy, " ", &save_ptr);
+
+  if (file_copy == NULL)
+    return -1;
  
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_copy, PRI_DEFAULT, start_process, fn_copy);
+
+  free(file_copy);
 
   if (tid == TID_ERROR)
   {
@@ -103,8 +112,10 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success)
+  { 
     thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -296,6 +307,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (argv[0]);
+  printf("file %d\n", file->pos);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
